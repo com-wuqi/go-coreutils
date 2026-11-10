@@ -1,0 +1,11 @@
+# Build and test artifacts
+/bin/
+*.exe
+*.test
+coverage.out
+coverage.html
+
+# Editor and OS noise
+.idea/
+.vscode/
+.DS_Store

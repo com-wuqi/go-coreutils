@@ -1,0 +1,10 @@
+# Keep text files LF in the repository regardless of core.autocrlf.
+* text=auto
+
+*.go   text eol=lf
+*.mod  text eol=lf
+*.md   text eol=lf
+*.ps1  text eol=crlf
+
+# Fixtures are compared byte-for-byte, so never rewrite their line endings.
+**/testdata/** text eol=lf
