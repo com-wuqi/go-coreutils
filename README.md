@@ -59,14 +59,14 @@ go-coreutils/
 
 ## 推荐学习顺序
 
-| 顺序 | 工具 | 主要练习 |
-|---|---|---|
-| 1 | [echo](docs/specs/echo.md) | 参数拼接、短选项状态、转义与字节输出 |
-| 2 | [cat](docs/specs/cat.md) | 流式读取、多输入、行号、行状态、错误后继续 |
-| 3 | [tee](docs/specs/tee.md) | 一次读取、多路写出、文件打开失败后的降级 |
-| 4 | [head](docs/specs/head.md) | 按行/按字节截断、文件头、选项覆盖顺序 |
-| 5 | [tail](docs/specs/tail.md) | 从尾部选择、`+N`、缓冲策略、末尾无换行 |
-| 6 | [wc](docs/specs/wc.md) | 计数、Unicode、固定列顺序、多文件汇总 |
+| 顺序 | 工具                       | 主要练习                                   |
+|------|----------------------------|--------------------------------------------|
+| 1    | [echo](docs/specs/echo.md) | 参数拼接、短选项状态、转义与字节输出       |
+| 2    | [cat](docs/specs/cat.md)   | 流式读取、多输入、行号、行状态、错误后继续 |
+| 3    | [tee](docs/specs/tee.md)   | 一次读取、多路写出、文件打开失败后的降级   |
+| 4    | [head](docs/specs/head.md) | 按行/按字节截断、文件头、选项覆盖顺序      |
+| 5    | [tail](docs/specs/tail.md) | 从尾部选择、`+N`、缓冲策略、末尾无换行     |
+| 6    | [wc](docs/specs/wc.md)     | 计数、Unicode、固定列顺序、多文件汇总      |
 
 ## 每个工具的练习闭环
 
@@ -88,7 +88,11 @@ go-coreutils/
 每个工具都必须实现（`internal/cli` 中已定义 `RunFunc`）：
 
 ```go
-func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int
+package cli
+import (
+	"io"
+)
+type RunFunc func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 ```
 
 - `args` 不包含程序名。
@@ -98,11 +102,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 
 退出码：
 
-| 退出码 | 含义 |
-|---|---|
-| 0 | 全部成功 |
-| 1 | 运行时错误或部分失败（继续处理能处理的输入） |
-| 2 | 参数/用法错误（解析失败，不处理任何操作数） |
+| 退出码 | 含义                                         |
+|--------|----------------------------------------------|
+| 0      | 全部成功                                     |
+| 1      | 运行时错误或部分失败（继续处理能处理的输入） |
+| 2      | 参数/用法错误（解析失败，不处理任何操作数）  |
 
 错误信息：
 

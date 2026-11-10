@@ -26,6 +26,6 @@ type RunFunc func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 // NotImplemented is the placeholder used by the Run stubs. It reports a
 // failure so the acceptance tests stay red until the tool is implemented.
 func NotImplemented(prog string, stderr io.Writer) int {
-	fmt.Fprintf(stderr, "%s: not implemented\n", prog)
+	_, _ = fmt.Fprintf(stderr, "%s: not implemented\n", prog)
 	return ExitFailure
 }
