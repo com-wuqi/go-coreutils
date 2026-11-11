@@ -48,4 +48,5 @@
 - 修改行为时，同一次改动中更新 spec、测试和 `docs/progress.md`。
 - 测试名称出现在 spec 的“测试对照”表中，重命名测试时同步更新。
 - 新增工具时，在 `docs/progress.md` 和本索引中登记。
+- 共享包（如计划中的 `internal/opt`）的设计见 [architecture.md §5.4](../architecture.md)；落地时再补对应 spec。
 - 公共规则（选项扫描、错误格式、stdin 名称等）只在 [architecture.md](../architecture.md) 中定义，spec 只写差异和细节。

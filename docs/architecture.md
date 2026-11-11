@@ -9,7 +9,7 @@ cmd/<tool>/main.go
       │  只做接线：os.Args、os.Stdin、os.Stdout、os.Stderr
       ▼
 internal/<tool>/<tool>.go
-      │  全部命令逻辑；只依赖标准库和 internal/cli
+      │  全部命令逻辑；依赖标准库和 internal 下的共享包
       ▼
 internal/cli
          退出码、RunFunc、NotImplemented（无命令逻辑）
@@ -24,9 +24,12 @@ internal/testutil
 约束：
 
 - `cmd` 不做参数解析、不打印错误、不决定退出码。
-- `internal/<tool>` 不导入其他工具包；共享逻辑优先留在包内，确实需要时再抽象。
+- `internal/<tool>` **可以**导入 `internal/cli` 等纯共享包；**不要导入其他工具包**，避免 `cat` 依赖 `head` 这类工具间耦合。
+- 共享能力放在 `internal/<shared>` 下（例如 `cli`、`testutil`，以及后续可抽取的参数解析器）；共享包不得包含单个命令的业务策略或文件 I/O。
 - `internal/cli` 只放跨工具约定，不放某个工具的行为。
 - `internal/testutil` 仅用于测试；命令行二进制不会导入它。
+
+> Go 的 `internal/` 限制的是**模块外**导入；在本模块内，工具包导入任意共享内部包是正常用法。真正要避免的是工具包之间的横向依赖，以及把单个命令的策略塞进共享包。
 
 ## 2. `Run` 契约
 
@@ -119,6 +122,91 @@ echo 没有通用扫描器：
 - 只处理**前置**参数；只要参数完整匹配 `-[neE]+` 就是选项簇，可组合。
 - 选项按出现顺序生效（`-e -E` 关闭转义，`-E -e` 开启转义）。
 - 第一个不匹配的参数开始输出；它和之后的所有参数都按字面量处理，包括 `--`、`-z`、`-nx`。
+
+### 5.4 共享解析器设计草案（尚未实现）
+
+> 状态：设计提案，尚未创建代码。当前各工具仍各自解析；是否落地待评估。落地后本节应去掉“草案”标记，并补充对应测试与 `docs/specs/opt.md`。
+
+**目标**：把 5.1/5.2 的纯语法扫描抽到 `internal/opt`，让 cat/head/tail/wc/tee 复用；echo 不接入。
+
+**建议包与 API**：
+
+```go
+// Package opt internal/opt/opt.go（草案，尚未创建）
+package opt
+
+// Option 声明一个短选项。TakesValue 为 true 时该选项需要一个值。
+type Option struct {
+	Short      byte
+	TakesValue bool
+}
+
+// Occurrence 是命令行中出现的一次选项。
+type Occurrence struct {
+	Short byte
+	Value string // 无值选项时为空
+}
+
+// Result 是解析结果。
+type Result struct {
+	Operands []string     // 保持命令行顺序
+	Options  []Occurrence // 保持命令行顺序，供工具实现 last-wins
+}
+
+// UsageError 表示参数语法错误；Error() 返回 "<prog>: <msg>"。
+type UsageError struct {
+	Prog string
+	Msg  string
+}
+
+// Parse 按 options 扫描 args。它只做语法层，不校验数字、不处理 I/O。
+type Parse(prog string, options []Option, args []string) (Result, error)
+```
+
+语法错误只覆盖两类，消息格式与第 4 节一致：
+
+- `unrecognized option: <完整原始 token>`，例如 `unrecognized option: -qz`；
+- `option requires an argument: -<选项字符>`，例如 `option requires an argument: -n`。
+
+工具的使用方式（示意）：
+
+```go
+parsed, err := opt.Parse("head", []opt.Option{
+	{Short: 'n', TakesValue: true},
+	{Short: 'c', TakesValue: true},
+	{Short: 'q'},
+	{Short: 'v'},
+}, args)
+if err != nil {
+	fmt.Fprintln(stderr, err)
+	return cli.ExitUsage
+}
+for _, o := range parsed.Options {
+	switch o.Short {
+	case 'n':
+		// 在这里做数字校验和 last-wins；非法值由工具输出 invalid number。
+	case 'q':
+		// ...
+	}
+}
+```
+
+**职责边界**：
+
+| 层 | 负责 |
+|---|---|
+| `internal/opt` | `--`、单独 `-`、短选项簇、附加值/下一参数值、选项与操作数混排、未知选项与缺值错误、保留出现顺序 |
+| 各工具 | 数字/取值校验（`invalid number`）、last-wins 与覆盖规则（如 `-b` 覆盖 `-n`）、文件 I/O、文件头、计数、运行时错误、退出码 |
+| echo | 完全保留 5.3 的特殊解析，不依赖 `internal/opt` |
+
+**如果落地，建议步骤**：
+
+1. 新增 `internal/opt/opt.go` 与 `internal/opt/opt_test.go`，测试覆盖：选项簇、附加值、独立值、以 `-` 开头的值、`--`、`-`、混排、未知选项、缺值、空参数。
+2. 新增 `docs/specs/opt.md`，并更新 `docs/specs/README.md` 与 `docs/progress.md`。
+3. 五个工具改为调用 `opt.Parse`；现有工具验收测试保持不变（它们只测 `Run` 的行为）。
+4. 删除本节“草案/尚未实现”标记。
+
+**备选方案**：继续让每个工具自行解析。优点是解析规则是重要练习内容；缺点是同一套边界逻辑重复五遍，修一处要改五处。标准库 `flag` 不足以覆盖组合短选项、附加值、混排和 `--` 后操作数，所以无论共享与否都需要手写扫描。
 
 ## 6. 字节、换行与流
 

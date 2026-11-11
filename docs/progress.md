@@ -88,6 +88,10 @@
 - [ ] `pwsh -NoProfile -File scripts/check.ps1` 通过
 - [ ] README、spec、测试三者无行为差异
 
+## 架构决策
+
+- [ ] 评估把通用参数扫描抽成 `internal/opt`（设计草案见 [architecture.md §5.4](architecture.md)）。当前各工具仍自行解析，工具验收测试不受影响；若落地，需要解析器测试与 `docs/specs/opt.md`。
+
 ## 进阶练习（不在验收测试内）
 
 完成后可选做，并自行补测试：
