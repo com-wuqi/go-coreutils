@@ -13,12 +13,19 @@
 | tail | [tail.md](tail.md) | `internal/tail/tail_test.go` | 尾部选择、`+N`、缓冲 |
 | wc | [wc.md](wc.md) | `internal/wc/wc_test.go` | 计数、Unicode、固定列格式 |
 
+## 共享包
+
+| 包  | 规范             | 测试                       | 说明                                                    |
+|-----|------------------|----------------------------|---------------------------------------------------------|
+| opt | [opt.md](opt.md) | `internal/opt/opt_test.go` | cat/head/tail/wc/tee 复用的短选项扫描器；`Parse` 待实现 |
+
 ## 阅读顺序
 
 1. 先看本文和 [架构约定](../architecture.md) 中的公共规则（退出码、错误格式、参数扫描）。
-2. 再看目标工具的“用法”“选项”“行为细节”。
-3. 实现时对照“测试对照”表逐项验证。
-4. 全部通过后阅读“进阶练习”，自行扩展。
+2. 如果要实现 cat/head/tail/wc/tee，建议先完成 [opt.md](opt.md) 中的共享解析器。
+3. 再看目标工具的“用法”“选项”“行为细节”。
+4. 实现时对照“测试对照”表逐项验证。
+5. 全部通过后阅读“进阶练习”，自行扩展。
 
 ## 写新 spec 的模板
 
@@ -48,5 +55,5 @@
 - 修改行为时，同一次改动中更新 spec、测试和 `docs/progress.md`。
 - 测试名称出现在 spec 的“测试对照”表中，重命名测试时同步更新。
 - 新增工具时，在 `docs/progress.md` 和本索引中登记。
-- 共享包（如计划中的 `internal/opt`）的设计见 [architecture.md §5.4](../architecture.md)；落地时再补对应 spec。
+- 共享包（如 `internal/opt`）的规范见 [opt.md](opt.md)，设计说明见 [architecture.md §5.4](../architecture.md)。
 - 公共规则（选项扫描、错误格式、stdin 名称等）只在 [architecture.md](../architecture.md) 中定义，spec 只写差异和细节。

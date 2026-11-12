@@ -5,7 +5,9 @@
 ## 1. 测试放在哪
 
 - 每个工具一个外部测试包：`internal/<tool>/<tool>_test.go`，包名为 `<tool>_test`。
-- 测试只导入 `go-coreutils/internal/<tool>` 和 `go-coreutils/internal/testutil`。
+- 共享解析器使用 `internal/opt/opt_test.go`（`package opt_test`），只测 `opt.Parse` 的公开行为。
+- 工具测试只导入 `go-coreutils/internal/<tool>` 和 `go-coreutils/internal/testutil`；`opt` 测试使用标准库 `testing`，不依赖
+  `testutil`。
 - 固定输入放在 `internal/<tool>/testdata/`；可写文件使用 `t.TempDir()`。
 - 不为 `cmd` 写测试：入口只有三行接线。
 
@@ -14,6 +16,7 @@
 ```powershell
 go test ./...                          # 全部
 go test ./internal/echo -v             # 单工具，显示子测试
+go test ./internal/opt -v              # 共享解析器
 go test ./internal/cat -run TestRun    # 单个测试函数
 go test ./internal/head -run 'TestRunFiles/multiple' -v
 go test ./... -race                    # 竞态检测
@@ -25,7 +28,12 @@ go test -run '^$' ./...                # 只编译，不运行
 
 ## 3. 初始红态
 
-所有失败最终都源于 `cli.NotImplemented`（存根向 stderr 写错误并返回 1）：
+初始红态有两个来源，都是预期的：
+
+- 工具包的失败源于 `cli.NotImplemented`（存根向 stderr 写错误并返回 1）。
+- `internal/opt` 的失败源于 `Parse` 存根直接返回错误。
+
+工具包的典型输出：
 
 ```text
 exit code mismatch:
@@ -70,6 +78,8 @@ func AssertContains(t *testing.T, label, got, sub string)
 func WriteFile(t *testing.T, dir, name, content string) string
 func WriteFiles(t *testing.T, files map[string]string) (dir string)
 ```
+
+`internal/opt` 不经过 `testutil`：它没有 I/O 和退出码，直接用表驱动测试比较 `Result` 的 `Operands`/`Options` 和错误文本。
 
 用法示例：
 

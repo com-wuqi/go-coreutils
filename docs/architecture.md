@@ -13,6 +13,8 @@ internal/<tool>/<tool>.go
       ▼
 internal/cli
          退出码、RunFunc、NotImplemented（无命令逻辑）
+internal/opt
+         共享短选项扫描（Parse 待实现，见 5.4）
 
 internal/<tool>/<tool>_test.go
       │  只调用 <tool>.Run，不触碰内部实现
@@ -123,16 +125,17 @@ echo 没有通用扫描器：
 - 选项按出现顺序生效（`-e -E` 关闭转义，`-E -e` 开启转义）。
 - 第一个不匹配的参数开始输出；它和之后的所有参数都按字面量处理，包括 `--`、`-z`、`-nx`。
 
-### 5.4 共享解析器设计草案（尚未实现）
+### 5.4 共享解析器（脚手架已建立，`Parse` 待实现）
 
-> 状态：设计提案，尚未创建代码。当前各工具仍各自解析；是否落地待评估。落地后本节应去掉“草案”标记，并补充对应测试与 `docs/specs/opt.md`。
+> 状态：类型、`UsageError`、存根、25 个验收测试和 [opt.md](specs/opt.md) 已就绪；`Parse` 仍返回 `opt: not implemented`
+> ，五个工具尚未接入。
 
 **目标**：把 5.1/5.2 的纯语法扫描抽到 `internal/opt`，让 cat/head/tail/wc/tee 复用；echo 不接入。
 
-**建议包与 API**：
+**包与 API**（实现见 `internal/opt/opt.go`）：
 
 ```go
-// Package opt internal/opt/opt.go（草案，尚未创建）
+// internal/opt/opt.go（Parse 为存根）
 package opt
 
 // Option 声明一个短选项。TakesValue 为 true 时该选项需要一个值。
@@ -160,7 +163,7 @@ type UsageError struct {
 }
 
 // Parse 按 options 扫描 args。它只做语法层，不校验数字、不处理 I/O。
-type Parse(prog string, options []Option, args []string) (Result, error)
+func Parse(prog string, options []Option, args []string) (Result, error)
 ```
 
 语法错误只覆盖两类，消息格式与第 4 节一致：
@@ -199,14 +202,16 @@ for _, o := range parsed.Options {
 | 各工具 | 数字/取值校验（`invalid number`）、last-wins 与覆盖规则（如 `-b` 覆盖 `-n`）、文件 I/O、文件头、计数、运行时错误、退出码 |
 | echo | 完全保留 5.3 的特殊解析，不依赖 `internal/opt` |
 
-**如果落地，建议步骤**：
+**落地状态**：
 
-1. 新增 `internal/opt/opt.go` 与 `internal/opt/opt_test.go`，测试覆盖：选项簇、附加值、独立值、以 `-` 开头的值、`--`、`-`、混排、未知选项、缺值、空参数。
-2. 新增 `docs/specs/opt.md`，并更新 `docs/specs/README.md` 与 `docs/progress.md`。
-3. 五个工具改为调用 `opt.Parse`；现有工具验收测试保持不变（它们只测 `Run` 的行为）。
-4. 删除本节“草案/尚未实现”标记。
+1. [x] 新增 `internal/opt/opt.go`（类型 + `Parse` 存根）与 `internal/opt/opt_test.go`（25 个用例）。
+2. [x] 新增 `docs/specs/opt.md`，并更新 `docs/specs/README.md` 与 `docs/progress.md`。
+3. [ ] 实现 `Parse`，让 `go test ./internal/opt` 全绿。
+4. [ ] 五个工具改为调用 `opt.Parse`；现有工具验收测试保持不变（它们只测 `Run` 的行为）。
+5. [ ] 删除本节和 `Parse` 中的“待实现”标记。
 
-**备选方案**：继续让每个工具自行解析。优点是解析规则是重要练习内容；缺点是同一套边界逻辑重复五遍，修一处要改五处。标准库 `flag` 不足以覆盖组合短选项、附加值、混排和 `--` 后操作数，所以无论共享与否都需要手写扫描。
+**备选方案**：继续让每个工具自行解析。优点是解析规则是重要练习内容；缺点是同一套边界逻辑重复五遍，修一处要改五处。当前已选择共享方案，但工具仍可自行解析——工具验收测试只检查行为，不检查是否调用
+`internal/opt`。
 
 ## 6. 字节、换行与流
 

@@ -2,13 +2,14 @@
 
 用 Go 复刻常见终端工具，练习命令行参数解析、流式 I/O、字节与 Unicode 处理、错误信息与退出码。
 
-**这个仓库只提供脚手架：目录结构、行为规范、160 多个验收测试。所有命令实现都留给你。**
+**这个仓库只提供脚手架：目录结构、行为规范、190 个验收测试。所有命令实现和共享解析器的 `Parse` 都留给你。**
 
 ## 当前状态
 
 - `internal/<tool>/<tool>.go` 中只有一个 `Run` 存根，固定返回 `not implemented`。
-- `go test ./...` 当前故意全红，这是预期状态。
-- 你按工具实现 `Run`，对应包的测试就会逐项变绿。
+- `internal/opt/opt.go` 中是共享解析器的 `Parse` 存根，同样待实现。
+- `go test ./...` 当前故意全红（6 个工具包 + `internal/opt`）。
+- 你按工具实现 `Run`（并先实现 `Parse`），对应包的测试就会逐项变绿。
 
 ## 环境要求
 
@@ -21,8 +22,9 @@
 ```powershell
 go version
 go build ./...
-go test ./...                 # 初始：6 个工具包全部失败
+go test ./...                 # 初始：6 个工具包 + opt 全部失败
 go test ./internal/echo -v    # 建议先从一个工具开始
+go test ./internal/opt -v     # cat/head/tail/wc/tee 的共享解析器
 go run ./cmd/echo hello       # 未实现时输出 "echo: not implemented"
 ```
 
@@ -48,25 +50,27 @@ go-coreutils/
 │   ├── <tool>_test.go          # 验收测试，不要为了让测试通过而修改
 │   └── testdata/               # 固定输入文件
 ├── internal/cli/               # 退出码、RunFunc、NotImplemented
+├── internal/opt/               # 共享短选项扫描（Parse 存根 + 25 个测试）
 ├── internal/testutil/          # 测试辅助：捕获 I/O、断言、临时文件
 ├── docs/
 │   ├── architecture.md         # 分层与统一契约
 │   ├── testing.md              # 测试运行与编写指南
 │   ├── progress.md             # 实现进度清单
-│   └── specs/<tool>.md         # 每个工具的行为规范（唯一准绳）
+│   └── specs/                  # 各工具与 opt 的行为规范（唯一准绳）
 └── scripts/check.ps1           # gofmt + vet + build + test 一键检查
 ```
 
 ## 推荐学习顺序
 
-| 顺序 | 工具                       | 主要练习                                   |
-|------|----------------------------|--------------------------------------------|
-| 1    | [echo](docs/specs/echo.md) | 参数拼接、短选项状态、转义与字节输出       |
-| 2    | [cat](docs/specs/cat.md)   | 流式读取、多输入、行号、行状态、错误后继续 |
-| 3    | [tee](docs/specs/tee.md)   | 一次读取、多路写出、文件打开失败后的降级   |
-| 4    | [head](docs/specs/head.md) | 按行/按字节截断、文件头、选项覆盖顺序      |
-| 5    | [tail](docs/specs/tail.md) | 从尾部选择、`+N`、缓冲策略、末尾无换行     |
-| 6    | [wc](docs/specs/wc.md)     | 计数、Unicode、固定列顺序、多文件汇总      |
+| 顺序 | 目标                               | 主要练习                                   |
+|------|------------------------------------|--------------------------------------------|
+| 1    | [echo](docs/specs/echo.md)         | 参数拼接、短选项状态、转义与字节输出       |
+| 2    | [opt（共享包）](docs/specs/opt.md) | 短选项扫描、附加值、`--`、错误契约         |
+| 3    | [cat](docs/specs/cat.md)           | 流式读取、多输入、行号、行状态、错误后继续 |
+| 4    | [tee](docs/specs/tee.md)           | 一次读取、多路写出、文件打开失败后的降级   |
+| 5    | [head](docs/specs/head.md)         | 按行/按字节截断、文件头、选项覆盖顺序      |
+| 6    | [tail](docs/specs/tail.md)         | 从尾部选择、`+N`、缓冲策略、末尾无换行     |
+| 7    | [wc](docs/specs/wc.md)             | 计数、Unicode、固定列顺序、多文件汇总      |
 
 ## 每个工具的练习闭环
 
@@ -76,6 +80,9 @@ go-coreutils/
 4. 全部通过后，对照 spec 的“边界情况”手动补测几个输入。
 5. 在 `docs/progress.md` 中勾掉对应项。
 6. 想继续挑战时，完成 spec 末尾的“进阶练习”，并为它补充你自己的测试。
+
+`internal/opt` 也使用同一闭环：读 [opt.md](docs/specs/opt.md) → 实现 `Parse` → `go test ./internal/opt -v`
+。cat/head/tail/wc/tee 推荐复用它的解析结果。
 
 规则：
 
@@ -120,6 +127,7 @@ type RunFunc func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 - `--` 之后全部是操作数；单独的 `-` 是操作数。
 - 选项可以出现在操作数之后（GNU 风格混排）。
 - 未知选项、缺少值、非法数字 → 退出码 2。
+- 共享扫描器位于 `internal/opt`（类型、测试、`Parse` 存根已就绪）；工具可以复用它，也可以自行解析，验收测试只看行为。
 - echo 是特例：只识别前置的 `-n`/`-e`/`-E`，其余按字面量处理。
 
 完整约定见 [docs/architecture.md](docs/architecture.md)。
@@ -129,6 +137,7 @@ type RunFunc func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 ```powershell
 go test ./...                       # 全部测试
 go test ./internal/cat -v           # 单个工具，显示每个子测试
+go test ./internal/opt -v           # 共享解析器
 go test ./internal/cat -run 'TestRunFiles' -v
 go test ./... -race                 # 竞态检测
 go test ./... -cover                # 覆盖率
@@ -182,7 +191,8 @@ pwsh -NoProfile -File scripts/check.ps1 -Tool cat    # 只测 cat
 不会。工具按字节处理，`\n` 是行分隔符；测试用例通过内存或 `testdata` 提供固定字节。`.gitattributes` 保证夹具始终以 LF 检出。
 
 **可以用标准库 `flag` 包吗？**
-可以，但它不支持组合短选项、附加值和选项与操作数混排。要满足测试，通常需要自己写一个小型参数扫描器。
+可以，但它不支持组合短选项、附加值和选项与操作数混排。要满足测试，通常需要手写扫描：要么实现 `internal/opt` 的 `Parse`
+（推荐），要么在每个工具里各写一份。
 
 **`go run ./cmd/cat file` 输出 `cat: not implemented` 正常吗？**
 正常，说明 `cmd` 接线正确、实现尚未开始。
